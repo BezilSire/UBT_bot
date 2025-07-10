@@ -1,0 +1,6 @@
+# This file makes Python treat the `handlers` directory as a package.
+
+# Import handlers here to make them accessible
+# from .onboarding import ...
+# from .referral import ...
+# etc.
