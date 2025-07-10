@@ -35,36 +35,32 @@ async def check_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
     # Fetch balances from Firebase user document
     # Ensure these field names match what's set during onboarding and referral rewards
     ubt_balance = db_user.get('ubt_balance', 0.0)
-    referral_rewards_balance = db_user.get('referral_rewards_balance', 0.0)
-    # total_balance = ubt_balance + referral_rewards_balance # Or however you define total
+    base_payout_address = db_user.get('base_payout_address', 'Not set')
+    # referral_rewards_balance = db_user.get('referral_rewards_balance', 0.0) # This is part of ubt_balance
 
-    # Transaction history - Placeholder for now
-    # In a real system, transactions would be stored in a subcollection or separate collection in Firebase.
-    # For example: /users/{user_id}/transactions/{transaction_id}
-    # transactions = firebase_client.get_transactions(user_id_str, limit=5) # Method to be created
-    transaction_history_message = "Transaction History: (Coming Soon - No transactions logged yet)"
-    # if transactions:
-    #     transaction_history_message = "Recent Transactions:\n"
-    #     for tx in transactions:
-    #         tx_type = tx.get('type', 'N/A').capitalize()
-    #         tx_amount = tx.get('amount', 0)
-    #         tx_date = tx.get('timestamp', 'N/A') # Assuming timestamp is stored
-    #         # Format date nicely if it's a datetime object or ISO string
-    #         sign = "+" if tx.get('direction') == "credit" else "-"
-    #         transaction_history_message += f"  - {tx_date}: {sign}{tx_amount:.2f} UBT ({tx_type})\n"
-    # else:
-    #     transaction_history_message = "No recent transactions found."
+    transaction_history_message = "Transaction History: (Feature coming soon)"
 
+    wallet_info_parts = [
+        f"🤑 *Your Ubuntium Account Status* 🤑\n",
+        f"💰 UBT Balance (Tracked for Payout): *{ubt_balance:.2f} UBT*",
+    ]
 
-    message_text = (
-        f"🤑 *Your Ubuntium Wallet* 🤑\n\n"
-        f"💰 Main Balance: *{ubt_balance:.2f} UBT*\n"
-        # f"🎁 Referral Rewards: *{referral_rewards_balance:.2f} UBT*\n" # This is part of main balance now
-        # f"📊 Total UBT: *{total_balance:.2f} UBT*\n\n"
-        f"{transaction_history_message}\n\n"
-        f"✨ All rewards are automatically added to your Main Balance.\n"
-        f"(Full wallet features like sending/receiving UBT are coming soon!)"
+    if base_payout_address != 'Not set':
+        wallet_info_parts.append(f"🏦 Your Registered Base Payout Address:\n`{base_payout_address}`")
+    else:
+        wallet_info_parts.append(
+            "⚠️ Your Base payout address is not set. "
+            "Please complete onboarding or use a future command to set it up to receive your UBT."
+            # TODO: Add a button/command to update/set wallet address if missing post-onboarding
+        )
+
+    wallet_info_parts.append(f"\n📜 {transaction_history_message}")
+    wallet_info_parts.append(
+        "\n✨ All UBT shown here is tracked in our system. "
+        "Your total earned UBT will be sent to your registered Base address at the end of each month."
     )
+
+    message_text = "\n".join(wallet_info_parts)
 
     # Using the main menu keyboard from onboarding module for consistency
     reply_markup = get_main_menu_keyboard()

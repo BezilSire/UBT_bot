@@ -14,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Conversation states for onboarding
-NAME, PHONE, LOCATION, ONBOARDING_COMPLETE = range(4)
+NAME, PHONE, LOCATION, ASK_BASE_WALLET, ONBOARDING_COMPLETE = range(5)
 
 # Main menu keyboard (could be moved to a shared utils module)
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
@@ -158,9 +158,9 @@ async def receive_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     return LOCATION
 
 async def receive_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Saves location and completes onboarding."""
+    """Saves location and asks for Base wallet address."""
     user = update.effective_user
-    user_id_str = str(user.id)
+    # user_id_str = str(user.id) # Not needed here anymore, will be in receive_base_wallet
     location_data = None
 
     if update.message.location:
@@ -271,8 +271,111 @@ async def receive_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             reply_markup=get_main_menu_keyboard() # Or back to start options
         )
 
-    # Clean up onboarding data from context.user_data
-    for key in ['onboarding_name', 'onboarding_phone', 'onboarding_location', 'referred_by_code']:
+    context.user_data['onboarding_location'] = location_data
+
+    # Now ask for Base wallet address
+    await update.message.reply_text(
+        "Thanks! One last important step.\n\n"
+        "Please provide your **Base network wallet address** (from a non-custodial wallet like MetaMask, Trust Wallet, Coinbase Wallet, etc.). "
+        "This is where your earned UBT rewards will be sent monthly.\n\n"
+        "It should start with `0x` and be 42 characters long. Please double-check it for accuracy!",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ASK_BASE_WALLET
+
+async def receive_base_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Saves Base wallet address and completes onboarding."""
+    user = update.effective_user
+    user_id_str = str(user.id)
+    base_wallet_address = update.message.text.strip()
+
+    # Basic validation for Base address (starts with 0x, 42 chars)
+    if not re.match(r"^0x[a-fA-F0-9]{40}$", base_wallet_address):
+        await update.message.reply_text(
+            "Hmm, that doesn't look like a valid Base wallet address. "
+            "It should start with `0x` and be 42 characters long (e.g., `0x123...abc`).\n\nPlease try again.",
+            parse_mode='Markdown'
+        )
+        return ASK_BASE_WALLET
+
+    context.user_data['onboarding_base_payout_address'] = base_wallet_address
+    logger.info(f"User {user_id_str} provided Base wallet: {base_wallet_address}")
+
+    # --- All data collected, save to Firebase ---
+    if 'firebase_client' not in context.bot_data:
+        logger.error("Firebase client not found in bot_data during receive_base_wallet. Critical.")
+        await update.message.reply_text("A critical error occurred. Please try /start again.", reply_markup=get_main_menu_keyboard())
+        return ConversationHandler.END
+
+    firebase_client: FirebaseClient = context.bot_data['firebase_client']
+
+    unique_ref_code = context.user_data.get('referral_code') # Should have been set if this is a new user
+    if not unique_ref_code: # Should ideally not happen if logic is correct
+        unique_ref_code = f"UBT{str(uuid.uuid4())[:8].upper()}"
+        context.user_data['referral_code'] = unique_ref_code
+        logger.warning(f"Referral code was missing for user {user_id_str}, generated a new one: {unique_ref_code}")
+
+
+    user_payload = {
+        "telegram_id": user_id_str,
+        "username": user.username or "",
+        "first_name": user.first_name or "",
+        "last_name": user.last_name or "",
+        "name": context.user_data['onboarding_name'],
+        "phone_number": context.user_data['onboarding_phone'],
+        "location": context.user_data['onboarding_location'], # This is the dict
+        "base_payout_address": context.user_data['onboarding_base_payout_address'],
+        "referral_code": unique_ref_code,
+        "referred_by_code": context.user_data.get('referred_by_code'),
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "onboarding_completed": True,
+        "ubt_balance": 0.0,
+        "referral_rewards_balance": 0.0, # Still useful for tracking source of funds if needed
+        "referral_count": 0
+    }
+
+    if firebase_client.create_user(user_id_str, user_payload):
+        logger.info(f"User {user_id_str} successfully onboarded with Base wallet and data saved.")
+
+        referred_by_code = context.user_data.get('referred_by_code')
+        if referred_by_code:
+            referrer_user = firebase_client.find_user_by_referral_code(referred_by_code)
+            if referrer_user and referrer_user.get('telegram_id'):
+                referrer_telegram_id = referrer_user['telegram_id']
+                if referrer_telegram_id != user_id_str:
+                    reward_amount = 10
+                    if firebase_client.increment_referral_count(referrer_telegram_id) and \
+                       firebase_client.add_referral_reward(referrer_telegram_id, reward_amount):
+                        logger.info(f"Processed referral for {user_id_str} by {referrer_telegram_id}.")
+                        try:
+                            await context.bot.send_message(
+                                chat_id=referrer_telegram_id,
+                                text=f"🎉 Someone you referred ({user_payload['name']}) just joined Ubuntium! You've earned {reward_amount} UBT (this will be added to your monthly payout)."
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to send referral notification to {referrer_telegram_id}: {e}")
+                    else:
+                        logger.error(f"Failed to update count/reward for referrer {referrer_telegram_id}.")
+                else:
+                    logger.warning(f"Referrer with code {referred_by_code} not found.")
+
+        success_message = (
+            f"🎉 Welcome aboard, {context.user_data['onboarding_name']}! You are now part of the Ubuntium family.\n\n"
+            f"Your Base payout address is set to: `{base_wallet_address}`\n"
+            f"Your unique referral code is: `{unique_ref_code}` (Share this to earn UBT!)\n\n"
+            "All UBT you earn will be tracked here and paid out to your Base address monthly. "
+            "You can now explore the main menu."
+        )
+        await update.message.reply_text(success_message, reply_markup=get_main_menu_keyboard(), parse_mode='Markdown')
+    else:
+        logger.error(f"Failed to save user {user_id_str} to Firebase.")
+        await update.message.reply_text(
+            "Sorry, there was an issue saving your details. Please try /start again.",
+            reply_markup=get_main_menu_keyboard()
+        )
+
+    # Clean up all onboarding data from context.user_data
+    for key in ['onboarding_name', 'onboarding_phone', 'onboarding_location', 'onboarding_base_payout_address', 'referred_by_code', 'referral_code']:
         context.user_data.pop(key, None)
 
     return ConversationHandler.END
@@ -333,6 +436,7 @@ onboarding_conv_handler = ConversationHandler(
         NAME: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, receive_name)],
         PHONE: [MessageHandler(Filters.CONTACT | (Filters.TEXT & ~Filters.COMMAND), receive_phone)],
         LOCATION: [MessageHandler(Filters.LOCATION | (Filters.TEXT & ~Filters.COMMAND), receive_location)],
+        ASK_BASE_WALLET: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, receive_base_wallet)],
     },
     fallbacks=[
         CommandHandler("cancel", cancel_onboarding),

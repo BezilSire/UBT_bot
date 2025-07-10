@@ -4,11 +4,11 @@ This is the official Telegram bot for the Ubuntium (UBT) ecosystem. It serves as
 
 ## 🎯 Purpose
 
-*   Onboard new users to the Ubuntium ($UBT) ecosystem
-*   Track referrals and reward users
-*   Let users check UBT wallet balances
-*   Register vendors by location and category
-*   Provide financial education in local languages
+*   Onboard new users to the Ubuntium ($UBT) ecosystem, including collecting a Base network payout address.
+*   Track referrals and UBT earnings within the bot.
+*   Allow users to check their tracked UBT balance, which is paid out monthly to their registered Base address.
+*   Register vendors by location and category.
+*   Provide financial education in local languages.
 *   Link users to UBT utilities (vendors, swap, resources)
 *   Handle frequently asked questions and support
 *   Act as a 24/7 smart wallet concierge
@@ -16,20 +16,23 @@ This is the official Telegram bot for the Ubuntium (UBT) ecosystem. It serves as
 ## 🛠️ Tech Stack
 
 *   **Bot Framework:** Python (`python-telegram-bot`)
-*   **Backend Database:** Firebase (Firestore)
-*   **AI Language Model:** OpenAI GPT (for advanced NLP tasks)
-*   **Workflow Automation:** n8n (for backend logic and integrations)
+*   **Backend Database:** Firebase (Firestore for user data, vendor info, UBT balances)
+*   **Primary Automation:** Jules' native visual builder (conceptual for backend processes like payouts)
+*   **AI Language Model:** Google Gemini or other (via API, for future smart replies/NLP tasks)
 *   **Environment Management:** `python-dotenv`
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### User Prerequisites (for using the bot effectively)
+*   A Telegram account.
+*   A Base network compatible non-custodial crypto wallet (e.g., MetaMask, Trust Wallet, Coinbase Wallet) to receive monthly UBT payouts. Users will be asked for their Base payout address during onboarding.
+
+### Developer Prerequisites (for running/developing the bot)
 
 *   Python 3.8+
-*   Telegram Account
-*   Firebase Project
-*   OpenAI API Key (optional, for AI features)
-*   n8n instance (optional, for workflow automation)
+*   Firebase Project (with Firestore enabled)
+*   Google AI Studio API Key for Gemini (optional, for future AI features)
+*   Telegram Bot Token
 
 ### Setup
 
@@ -58,9 +61,8 @@ This is the official Telegram bot for the Ubuntium (UBT) ecosystem. It serves as
     *   Fill in the required values in your `.env` file:
         *   `TELEGRAM_BOT_TOKEN`: Your Telegram Bot token from BotFather.
         *   `FIREBASE_SERVICE_ACCOUNT_KEY_PATH`: Absolute path to your Firebase Admin SDK JSON key file.
-        *   `OPENAI_API_KEY`: Your OpenAI API key.
         *   `ADMIN_CHAT_ID`: Your Telegram user/group ID for admin notifications.
-        *   `N8N_WEBHOOK_URL`: Webhook URL for your n8n workflows (if used).
+        *   `GEMINI_API_KEY`: Your Google AI Studio API Key for Gemini (optional, for future AI features).
 
 5.  **Set up Firebase:**
     *   Create a Firebase project at [https://console.firebase.google.com/](https://console.firebase.google.com/).
