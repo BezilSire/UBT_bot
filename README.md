@@ -4,10 +4,10 @@ This is the official Telegram bot for the Ubuntium (UBT) ecosystem. It serves as
 
 ## 🎯 Purpose
 
-*   Onboard new users to the Ubuntium ($UBT) ecosystem, including collecting a Base network payout address.
-*   Track referrals and UBT earnings within the bot.
-*   Allow users to check their tracked UBT balance, which is paid out monthly to their registered Base address.
-*   Register vendors by location and category.
+*   Onboard new users to the Ubuntium ($UBT) ecosystem, collecting essential details including a Base network payout address.
+*   Implement a multi-tiered referral program to incentivize user growth, with UBT earnings tracked in Firebase.
+*   Allow users to check their tracked `total_ubt_earned`, which is paid out manually by admins monthly to their registered Base `wallet_address`.
+*   Register vendors by location and category, and reward referrers if a referred user becomes a vendor.
 *   Provide financial education in local languages.
 *   Link users to UBT utilities (vendors, swap, resources)
 *   Handle frequently asked questions and support
@@ -111,6 +111,44 @@ ubuntium_bot/
 *   `/findvendor` - Find UBT vendors near you.
 *   `/registervendor` - Register your business as a UBT vendor.
 *   `/learn` - Access financial education resources.
+
+## 🌟 Referral Program Details
+
+The Ubuntium bot features a multi-tiered referral program:
+*   **Unique Referral Code:** Every user receives a unique code upon onboarding.
+*   **Rewards for Referrer (User A) when they refer a New User (User B):**
+    *   `+5 UBT`: When User B successfully joins using User A's referral link.
+    *   `+2 UBT`: When User B (the new user) adds their Base wallet address during onboarding.
+        *   (Note: Since wallet addition is mandatory in current onboarding, this makes the effective reward for a complete direct referral +7 UBT for User A).
+    *   `+3 UBT`: If User B later registers their business as a vendor through the bot.
+*   **Indirect Referral Bonus (Override Bonus):**
+    *   `+1 UBT`: Awarded to User X if User X referred User A, and User A then successfully refers User B. (User X gets a bonus for their referral's successful referral).
+*   All UBT rewards are tracked off-chain in Firebase under the user's `total_ubt_earned` field.
+
+## 💰 Payout Process
+
+*   UBT earnings tracked by the bot (e.g., referral rewards) are **not sent automatically** to user wallets.
+*   At the **end of each month**, administrators will manually process payouts from the Ubuntium treasury to users' registered Base `wallet_address` based on their `total_ubt_earned`.
+*   After payouts, admin processes will reset `total_ubt_earned` to 0 and update `last_payout_timestamp` and `payout_ready` status in Firebase.
+
+## 📊 Firebase Data Structure (Users Collection)
+
+Key fields in each user document within the `users` collection in Firestore:
+*   `telegram_id` (String): The user's unique Telegram ID.
+*   `username` (String): Telegram username (if available).
+*   `name` (String): Full name provided by the user.
+*   `phone_number` (String): User's phone number.
+*   `location` (Object): Contains `text` and/or `latitude`/`longitude` and `type`.
+*   `wallet_address` (String): User's Base network payout address (e.g., from MetaMask, Trust Wallet).
+*   `referral_code` (String): This user's unique referral code.
+*   `referred_by_code` (String): The referral code of the user who referred them (if any).
+*   `total_ubt_earned` (Number): Total UBT accrued by the user, awaiting monthly payout.
+*   `referral_count` (Number): Count of direct referrals made by this user.
+*   `vendor_registered` (Boolean): `true` if the user has successfully registered a business.
+*   `last_payout_timestamp` (Timestamp/String): Timestamp of the last manual payout to this user.
+*   `payout_ready` (Boolean): Flag indicating if `total_ubt_earned > 0`. Bot sets to `true` when earnings occur. Admins set to `false` after payout.
+*   `onboarding_completed` (Boolean): `true` if the user has completed the onboarding flow.
+*   `created_at` (Timestamp/String): Timestamp of user creation.
 
 ## Contributing
 

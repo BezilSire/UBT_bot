@@ -182,21 +182,80 @@ class FirebaseClient:
             logger.error(f"Error incrementing referral count for {referrer_id}: {e}")
             return False
 
-    def add_referral_reward(self, referrer_id, reward_amount):
-        if not self.db: return False
+    def add_referral_reward(self, user_id, reward_amount):
+        """
+        Adds reward_amount to user's total_ubt_earned and sets payout_ready to True.
+        """
+        if not self.db:
+            logger.error("Firestore client not initialized. Cannot add reward.")
+            return False
         try:
-            user_ref = self.db.collection('users').document(str(referrer_id))
-            # This assumes 'referral_rewards_balance' and 'ubt_balance' exist or are created
-            # You might want separate fields for total rewards vs claimable rewards
-            user_ref.update({
-                'referral_rewards_balance': firestore.Increment(reward_amount),
-                'ubt_balance': firestore.Increment(reward_amount) # Or add to a separate rewards pool first
-            })
-            logger.info(f"Added {reward_amount} UBT referral reward to user {referrer_id}")
+            user_ref = self.db.collection('users').document(str(user_id))
+
+            # Atomically increment total_ubt_earned and set payout_ready to true
+            # This can be done in one update call.
+            # If total_ubt_earned was 0 and reward_amount > 0, payout_ready becomes true.
+            # If total_ubt_earned was already > 0, it remains true.
+            update_data = {
+                'total_ubt_earned': firestore.Increment(reward_amount)
+            }
+            # Only set payout_ready to true if there's a positive reward leading to a positive balance.
+            # This doesn't strictly check if total_ubt_earned > 0 *after* increment,
+            # but assumes reward_amount is positive. A read-modify-write transaction would be more robust for conditional set.
+            # For simplicity, if any reward is added, we mark them as payout_ready.
+            # Admin process should verify total_ubt_earned > 0 before payout.
+            if reward_amount > 0:
+                update_data['payout_ready'] = True # Set/ensure it's true
+
+            user_ref.update(update_data)
+            logger.info(f"Added {reward_amount} UBT to total_ubt_earned for user {user_id} and set payout_ready=True.")
             return True
         except Exception as e:
-            logger.error(f"Error adding referral reward for {referrer_id}: {e}")
+            logger.error(f"Error adding reward for user {user_id}: {e}")
             return False
+
+    def update_user_field(self, user_id, field_name, value):
+        """
+        Updates a specific field for a given user.
+        """
+        if not self.db:
+            logger.error("Firestore client not initialized. Cannot update user field.")
+            return False
+        try:
+            user_ref = self.db.collection('users').document(str(user_id))
+            user_ref.update({field_name: value})
+            logger.info(f"Updated field '{field_name}' to '{value}' for user {user_id}.")
+            return True
+        except Exception as e:
+            logger.error(f"Error updating field '{field_name}' for user {user_id}: {e}")
+            return False
+
+    def get_user_referrer_details(self, referred_user_id):
+        """
+        Fetches the referred user, gets their 'referred_by_code',
+        and then finds the actual referrer user by that code.
+        Returns the referrer's user document (dict) or None.
+        """
+        if not self.db:
+            logger.error("Firestore client not initialized.")
+            return None
+
+        referred_user_doc = self.get_user(str(referred_user_id))
+        if not referred_user_doc:
+            logger.warning(f"Referred user {referred_user_id} not found.")
+            return None
+
+        referrer_code = referred_user_doc.get('referred_by_code')
+        if not referrer_code:
+            logger.info(f"Referred user {referred_user_id} has no 'referred_by_code'.")
+            return None
+
+        referrer_user_doc = self.find_user_by_referral_code(referrer_code)
+        if not referrer_user_doc:
+            logger.warning(f"Referrer user with code {referrer_code} (for referred user {referred_user_id}) not found.")
+            return None
+
+        return referrer_user_doc # This dict includes 'telegram_id' and other fields of the referrer
 
 # Example usage (for testing locally, not part of the bot's runtime flow directly here):
 # if __name__ == '__main__':

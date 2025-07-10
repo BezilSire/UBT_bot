@@ -177,7 +177,39 @@ async def process_confirmation(update: Update, context: ContextTypes.DEFAULT_TYP
 
         vendor_id = firebase_client.add_vendor(vendor_data)
         if vendor_id:
-            logger.info(f"Vendor registration submitted by {user_id_str}: {vendor_id} - {vendor_data['business_name']}")
+            logger.info(f"Vendor registration submitted by {user_id_str} (UserB): {vendor_id} - {vendor_data['business_name']}")
+
+            # 1. Update UserB's record to set vendor_registered = true
+            firebase_client.update_user_field(user_id_str, "vendor_registered", True)
+            logger.info(f"Set vendor_registered=true for user {user_id_str}")
+
+            # 2. Check if UserB was referred and reward their referrer (UserA)
+            user_b_data = firebase_client.get_user(user_id_str) # Get UserB's full data
+            if user_b_data and user_b_data.get("referred_by_code"):
+                referrer_code = user_b_data["referred_by_code"]
+                user_a_data = firebase_client.find_user_by_referral_code(referrer_code)
+
+                if user_a_data and user_a_data.get("telegram_id"):
+                    user_a_id = str(user_a_data.get("telegram_id"))
+                    vendor_reg_bonus = 3 # +3 UBT for vendor registration
+
+                    if firebase_client.add_referral_reward(user_a_id, vendor_reg_bonus):
+                        logger.info(f"Awarded +{vendor_reg_bonus} UBT to referrer {user_a_id} because their referral {user_id_str} registered as a vendor.")
+                        try:
+                            user_b_name = user_b_data.get("name", "Your referral")
+                            await context.bot.send_message(
+                                chat_id=user_a_id,
+                                text=f"🎉 {user_b_name} (whom you referred) just registered as a vendor! You've earned +{vendor_reg_bonus} UBT."
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to send vendor registration bonus notification to referrer {user_a_id}: {e}")
+                    else:
+                        logger.error(f"Failed to add vendor registration bonus for referrer {user_a_id}.")
+                else:
+                    logger.warning(f"Referrer with code {referrer_code} (for vendor {user_id_str}) not found.")
+            else:
+                logger.info(f"User {user_id_str} (vendor) was not referred or their data is incomplete. No vendor registration bonus for referrer.")
+
             await update.message.reply_text(
                 "🎉 Your business registration has been submitted successfully!\n"
                 "We'll review it and notify you once it's approved. "

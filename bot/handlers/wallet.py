@@ -33,31 +33,52 @@ async def check_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     # Fetch balances from Firebase user document
-    # Ensure these field names match what's set during onboarding and referral rewards
-    ubt_balance = db_user.get('ubt_balance', 0.0)
-    base_payout_address = db_user.get('base_payout_address', 'Not set')
-    # referral_rewards_balance = db_user.get('referral_rewards_balance', 0.0) # This is part of ubt_balance
+    # Fetch data based on the new Firebase structure
+    total_ubt_earned = db_user.get('total_ubt_earned', 0.0)
+    wallet_address = db_user.get('wallet_address', 'Not set') # Renamed from base_payout_address
+    vendor_registered = db_user.get('vendor_registered', False)
+    payout_ready = db_user.get('payout_ready', False)
+    last_payout_timestamp_str = db_user.get('last_payout_timestamp', None) # Expecting ISO string or None
 
-    transaction_history_message = "Transaction History: (Feature coming soon)"
+    if last_payout_timestamp_str:
+        try:
+            # Attempt to parse and format the timestamp nicely if it's a valid ISO string
+            # For example, "2023-10-26T10:00:00Z" -> "Oct 26, 2023, 10:00 AM UTC"
+            # This requires dateutil.parser or similar robust parsing.
+            # For simplicity, just show the string or "Never".
+            # from dateutil import parser
+            # last_payout_dt = parser.isoparse(last_payout_timestamp_str)
+            # last_payout_display = last_payout_dt.strftime("%b %d, %Y, %I:%M %p UTC")
+            last_payout_display = last_payout_timestamp_str # Keep as string for now
+        except Exception:
+            last_payout_display = "N/A (invalid date format)"
+    else:
+        last_payout_display = "Never"
+
+    transaction_history_message = "📜 Transaction History: (Full history coming soon)"
 
     wallet_info_parts = [
         f"🤑 *Your Ubuntium Account Status* 🤑\n",
-        f"💰 UBT Balance (Tracked for Payout): *{ubt_balance:.2f} UBT*",
+        f"💰 Total UBT Earned (for next payout): *{total_ubt_earned:.2f} UBT*",
     ]
 
-    if base_payout_address != 'Not set':
-        wallet_info_parts.append(f"🏦 Your Registered Base Payout Address:\n`{base_payout_address}`")
+    if wallet_address != 'Not set':
+        wallet_info_parts.append(f"🏦 Your Payout Wallet (Base Network):\n`{wallet_address}`")
     else:
         wallet_info_parts.append(
-            "⚠️ Your Base payout address is not set. "
-            "Please complete onboarding or use a future command to set it up to receive your UBT."
-            # TODO: Add a button/command to update/set wallet address if missing post-onboarding
+            "⚠️ Your Base payout wallet address is not set. "
+            "If you've completed onboarding, this is unusual. Please contact support. "
+            "If not, please complete /start to set it up."
         )
 
-    wallet_info_parts.append(f"\n📜 {transaction_history_message}")
+    wallet_info_parts.append(f"🏪 Registered as Vendor: {'✅ Yes' if vendor_registered else '❌ No'}")
+    wallet_info_parts.append(f"💸 Ready for Next Payout: {'✅ Yes' if payout_ready and total_ubt_earned > 0 else '❌ No'}")
+    wallet_info_parts.append(f"🗓️ Last Payout Date: {last_payout_display}")
+
+    wallet_info_parts.append(f"\n{transaction_history_message}")
     wallet_info_parts.append(
-        "\n✨ All UBT shown here is tracked in our system. "
-        "Your total earned UBT will be sent to your registered Base address at the end of each month."
+        "\n✨ All UBT shown is tracked in our system. "
+        "Your 'Total UBT Earned' will be sent to your registered Payout Wallet at the end of each month."
     )
 
     message_text = "\n".join(wallet_info_parts)

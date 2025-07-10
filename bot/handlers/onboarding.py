@@ -324,43 +324,83 @@ async def receive_base_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE
         "name": context.user_data['onboarding_name'],
         "phone_number": context.user_data['onboarding_phone'],
         "location": context.user_data['onboarding_location'], # This is the dict
-        "base_payout_address": context.user_data['onboarding_base_payout_address'],
+        "wallet_address": context.user_data['onboarding_base_payout_address'], # Renamed field
         "referral_code": unique_ref_code,
-        "referred_by_code": context.user_data.get('referred_by_code'),
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "referred_by_code": context.user_data.get('referred_by_code'), # This is fine, could also be 'referred_by_user_id'
+        "total_ubt_earned": 0.0, # New consolidated field, initialized to 0
+        "referral_count": 0,     # Number of direct referrals by this user
+        "vendor_registered": False, # Default to false
+        "last_payout_timestamp": None, # Or FieldValue.server_timestamp() if appropriate for "never paid"
+        "payout_ready": False,       # Default to false
         "onboarding_completed": True,
-        "ubt_balance": 0.0,
-        "referral_rewards_balance": 0.0, # Still useful for tracking source of funds if needed
-        "referral_count": 0
+        "created_at": datetime.utcnow().isoformat() + "Z" # Consistent with previous
+        # Removed ubt_balance and referral_rewards_balance as they are consolidated into total_ubt_earned
     }
 
     if firebase_client.create_user(user_id_str, user_payload):
-        logger.info(f"User {user_id_str} successfully onboarded with Base wallet and data saved.")
+        logger.info(f"User {user_id_str} successfully onboarded with Base wallet and data saved: {user_payload}")
 
+        # New Referral Logic Implementation
         referred_by_code = context.user_data.get('referred_by_code')
+        new_user_name = user_payload['name'] # Name of the user who just onboarded
+
         if referred_by_code:
-            referrer_user = firebase_client.find_user_by_referral_code(referred_by_code)
-            if referrer_user and referrer_user.get('telegram_id'):
-                referrer_telegram_id = referrer_user['telegram_id']
-                if referrer_telegram_id != user_id_str:
-                    reward_amount = 10
-                    if firebase_client.increment_referral_count(referrer_telegram_id) and \
-                       firebase_client.add_referral_reward(referrer_telegram_id, reward_amount):
-                        logger.info(f"Processed referral for {user_id_str} by {referrer_telegram_id}.")
+            direct_referrer_doc = firebase_client.find_user_by_referral_code(referred_by_code)
+
+            if direct_referrer_doc and direct_referrer_doc.get('telegram_id'):
+                direct_referrer_id = str(direct_referrer_doc.get('telegram_id'))
+
+                if direct_referrer_id != user_id_str: # Cannot refer self
+                    # 1. Direct Referrer Reward (+5 for signup, +2 for wallet = +7 total)
+                    direct_reward_amount = 7 # 5 (signup) + 2 (wallet added)
+                    if firebase_client.increment_referral_count(direct_referrer_id) and \
+                       firebase_client.add_referral_reward(direct_referrer_id, direct_reward_amount):
+                        logger.info(f"Awarded +{direct_reward_amount} UBT to direct referrer {direct_referrer_id} for new user {user_id_str}.")
                         try:
                             await context.bot.send_message(
-                                chat_id=referrer_telegram_id,
-                                text=f"🎉 Someone you referred ({user_payload['name']}) just joined Ubuntium! You've earned {reward_amount} UBT (this will be added to your monthly payout)."
+                                chat_id=direct_referrer_id,
+                                text=f"🎉 Your referral, {new_user_name}, successfully joined and added a wallet! You've earned +{direct_reward_amount} UBT."
                             )
                         except Exception as e:
-                            logger.error(f"Failed to send referral notification to {referrer_telegram_id}: {e}")
+                            logger.error(f"Failed to send direct referral success notification to {direct_referrer_id}: {e}")
                     else:
-                        logger.error(f"Failed to update count/reward for referrer {referrer_telegram_id}.")
-                else:
-                    logger.warning(f"Referrer with code {referred_by_code} not found.")
+                        logger.error(f"Failed to update count/reward for direct referrer {direct_referrer_id}.")
+
+                    # 2. Indirect Referrer (Override) Bonus (+1 UBT)
+                    # Check if the direct_referrer (User A) was themselves referred by someone (User X)
+                    # We need to fetch direct_referrer_doc again to get their 'referred_by_code' if not already fully loaded
+                    # or ensure find_user_by_referral_code returns all necessary fields including 'referred_by_code'
+
+                    # Assuming direct_referrer_doc contains the full document including 'referred_by_code'
+                    indirect_referrer_code = direct_referrer_doc.get('referred_by_code')
+                    if indirect_referrer_code:
+                        indirect_referrer_doc = firebase_client.find_user_by_referral_code(indirect_referrer_code)
+                        if indirect_referrer_doc and indirect_referrer_doc.get('telegram_id'):
+                            indirect_referrer_id = str(indirect_referrer_doc.get('telegram_id'))
+                            if indirect_referrer_id != direct_referrer_id and indirect_referrer_id != user_id_str: # Cannot be self or the new user
+                                indirect_reward_amount = 1
+                                if firebase_client.add_referral_reward(indirect_referrer_id, indirect_reward_amount):
+                                     logger.info(f"Awarded +{indirect_reward_amount} UBT (indirect) to {indirect_referrer_id} because their referral {direct_referrer_id} made a referral.")
+                                     try:
+                                         await context.bot.send_message(
+                                             chat_id=indirect_referrer_id,
+                                             text=f"🎉 Your referral's referral, {new_user_name}, just joined! You've earned an override bonus of +{indirect_reward_amount} UBT."
+                                         )
+                                     except Exception as e:
+                                         logger.error(f"Failed to send indirect referral notification to {indirect_referrer_id}: {e}")
+                                else:
+                                    logger.error(f"Failed to add indirect reward for {indirect_referrer_id}.")
+                            else:
+                                logger.info(f"Indirect referrer {indirect_referrer_code} is same as direct referrer or new user. No indirect bonus.")
+                        else:
+                            logger.warning(f"Indirect referrer with code {indirect_referrer_code} not found.")
+                else: # direct_referrer_id == user_id_str (self-referral attempt)
+                    logger.info(f"User {user_id_str} attempted self-referral with code {referred_by_code}. No referral rewards processed.")
+            else:
+                logger.warning(f"Direct referrer with code {referred_by_code} not found for new user {user_id_str}.")
 
         success_message = (
-            f"🎉 Welcome aboard, {context.user_data['onboarding_name']}! You are now part of the Ubuntium family.\n\n"
+            f"🎉 Welcome aboard, {new_user_name}! You are now part of the Ubuntium family.\n\n"
             f"Your Base payout address is set to: `{base_wallet_address}`\n"
             f"Your unique referral code is: `{unique_ref_code}` (Share this to earn UBT!)\n\n"
             "All UBT you earn will be tracked here and paid out to your Base address monthly. "
