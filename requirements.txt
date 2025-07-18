@@ -1,0 +1,4 @@
+sentence-transformers
+chromadb
+firebase-admin
+openai
