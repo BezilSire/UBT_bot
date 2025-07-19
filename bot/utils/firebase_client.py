@@ -277,5 +277,3 @@ class FirebaseClient:
 #             logger.error("FirebaseClient initialized, but Firestore DB is NOT available.")
 #     except Exception as e:
 #         logger.error(f"Failed to initialize FirebaseClient for standalone test: {e}", exc_info=True)
-
-```

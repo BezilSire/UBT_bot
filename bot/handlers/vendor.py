@@ -2,9 +2,9 @@ import logging
 import os
 from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, Filters, ConversationHandler
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, ConversationHandler
 from bot.utils.firebase_client import FirebaseClient
-from bot.handlers.onboarding import get_main_menu_keyboard # For main menu
+from bot.handlers.onboarding import get_main_menu_keyboard
 
 logger = logging.getLogger(__name__)
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
@@ -374,32 +374,32 @@ async def fv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Handlers
 register_vendor_conv_handler = ConversationHandler(
     entry_points=[
-        MessageHandler(Filters.Regex("^(💼 Register My Business|Register Vendor)$"), register_vendor_start),
+        MessageHandler(filters.Regex("^(💼 Register My Business|Register Vendor)$"), register_vendor_start),
         CommandHandler("registervendor", register_vendor_start)
     ],
     states={
-        BUSINESS_NAME: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, receive_business_name)],
-        LOCATION: [MessageHandler(Filters.LOCATION | (Filters.TEXT & ~Filters.COMMAND), receive_location)],
-        CATEGORY: [MessageHandler(Filters.Regex("^(🛍️ Retail|🍽️ Food & Drinks|🚕 Transport|📞 Airtime/Data|🌾 Farming|🛠️ Services|🏠 Accommodation|➕ Other)$"), receive_category)],
-        WALLET_ADDRESS: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, receive_wallet_address)],
-        CONFIRMATION: [MessageHandler(Filters.Regex("^(✅ Yes, Submit|❌ No, Restart)$"), process_confirmation)],
+        ASK_BUSINESS_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_business_name)],
+        ASK_LOCATION: [MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), ask_location)],
+        ASK_CATEGORY: [MessageHandler(filters.Regex("^(🛍️ Retail|🍽️ Food & Drinks|🚕 Transport|📞 Airtime/Data|🌾 Farming|🛠️ Services|🏠 Accommodation|➕ Other)$"), ask_category)],
+        ASK_WALLET_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_wallet_address)],
+        CONFIRM_DETAILS: [MessageHandler(filters.Regex("^(✅ Yes, Submit|❌ No, Restart)$"), process_confirmation)],
     },
-    fallbacks=[CommandHandler("cancel", cancel_registration), MessageHandler(Filters.Regex("^(Cancel|Stop)$"), cancel_registration)],
+    fallbacks=[CommandHandler("cancel", cancel_registration), MessageHandler(filters.Regex("^(Cancel|Stop)$"), cancel_registration)],
     # persistent=True, name="vendor_registration_conversation" # For persistence
 )
 
 find_vendor_conv_handler = ConversationHandler(
     entry_points=[
-        MessageHandler(Filters.Regex(r"^(📍 Find a UBT Vendor|Find Vendor)$"), find_vendor_start),
+        MessageHandler(filters.Regex(r"^(📍 Find a UBT Vendor|Find Vendor)$"), find_vendor_start),
         CommandHandler("findvendor", find_vendor_start)
     ],
     states={
-        FV_ASK_LOCATION: [MessageHandler(Filters.LOCATION | (Filters.TEXT & ~Filters.COMMAND), fv_receive_location)],
-        # FV_ASK_CATEGORY: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, fv_receive_category)], # If category step is added
+        FV_ASK_LOCATION: [MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), fv_receive_location)],
+        # FV_ASK_CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, fv_receive_category)], # If category step is added
     },
     fallbacks=[
         CommandHandler("cancel", fv_cancel),
-        MessageHandler(Filters.Regex("^(Cancel|Stop)$"), fv_cancel)
+        MessageHandler(filters.Regex("^(Cancel|Stop)$"), fv_cancel)
     ],
     # persistent=True, name="find_vendor_conversation" # For persistence
 )

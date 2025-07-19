@@ -1,8 +1,8 @@
 import logging
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton # Keep ReplyKeyboardMarkup if needed for menu button
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, Filters
-from bot.utils.firebase_client import FirebaseClient # Import FirebaseClient
-from bot.handlers.onboarding import get_main_menu_keyboard # For the main menu button
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from bot.utils.firebase_client import FirebaseClient
+from bot.handlers.onboarding import get_main_menu_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -90,4 +90,4 @@ async def check_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # Handlers
 wallet_handler = CommandHandler("wallet", check_wallet_command)
-check_wallet_button_handler = MessageHandler(Filters.Regex(r"^(💳 Check My Wallet|My Wallet|Wallet)$"), check_wallet_command)
+check_wallet_button_handler = MessageHandler(filters.Regex(r"^(💳 Check My Wallet|My Wallet|Wallet)$"), check_wallet_command)

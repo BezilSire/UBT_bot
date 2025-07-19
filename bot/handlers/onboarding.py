@@ -1,11 +1,19 @@
 import logging
-import re # For phone number validation
-import uuid # For generating unique referral codes
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, Filters, ConversationHandler
-from bot.utils.firebase_client import FirebaseClient # Assuming FirebaseClient is set up
-from . import education # Import education module to access its commands/handlers
+import re
+import uuid
 from datetime import datetime
+
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telegram.ext import (
+    ContextTypes,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ConversationHandler,
+)
+
+from bot.utils.firebase_client import FirebaseClient
+from . import education
 
 # Basic logging setup
 logging.basicConfig(
@@ -471,26 +479,26 @@ start_handler = CommandHandler("start", start) # This now acts as an entry point
 
 # Onboarding ConversationHandler
 onboarding_conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(Filters.Regex("^🚀 Get Started$"), start_onboarding_flow)],
+    entry_points=[MessageHandler(filters.Regex("^🚀 Get Started$"), start_onboarding_flow)],
     states={
-        NAME: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, receive_name)],
-        PHONE: [MessageHandler(Filters.CONTACT | (Filters.TEXT & ~Filters.COMMAND), receive_phone)],
-        LOCATION: [MessageHandler(Filters.LOCATION | (Filters.TEXT & ~Filters.COMMAND), receive_location)],
-        ASK_BASE_WALLET: [MessageHandler(Filters.TEXT & ~Filters.COMMAND, receive_base_wallet)],
+        NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_name)],
+        PHONE: [MessageHandler(filters.CONTACT | (filters.TEXT & ~filters.COMMAND), receive_phone)],
+        LOCATION: [MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), receive_location)],
+        ASK_BASE_WALLET: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_base_wallet)],
     },
     fallbacks=[
         CommandHandler("cancel", cancel_onboarding),
-        MessageHandler(Filters.Regex("^(Cancel|Stop)$"), cancel_onboarding)
+        MessageHandler(filters.Regex("^(Cancel|Stop)$"), cancel_onboarding)
     ],
     # per_user=True, per_chat=True # Default behavior, good for user-specific flows
     # persistent=True, name="onboarding_conversation" # For persistence across bot restarts if PicklePersistence is used
 )
 
 # Other handlers that are not part of the conversation but might be on the initial screen
-already_have_wallet_handler = MessageHandler(Filters.Regex("^🔐 Already Have Wallet$"), handle_already_have_wallet)
+already_have_wallet_handler = MessageHandler(filters.Regex("^🔐 Already Have Wallet$"), handle_already_have_wallet)
 # Learn About Ubuntium and Help are handled by their respective modules.
-learn_about_handler = MessageHandler(Filters.Regex("^📘 Learn About Ubuntium$"), education.education_command) # Direct to education module
+learn_about_handler = MessageHandler(filters.Regex("^📘 Learn About Ubuntium$"), education.education_command) # Direct to education module
 # This should be defined in education.py and imported, temp placeholder:
 # async def temp_edu_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #     await update.message.reply_text("Education module selected (linking properly soon).")
-# learn_about_handler = MessageHandler(Filters.Regex("^📘 Learn About Ubuntium$"), temp_edu_start)
+# learn_about_handler = MessageHandler(filters.Regex("^📘 Learn About Ubuntium$"), temp_edu_start)

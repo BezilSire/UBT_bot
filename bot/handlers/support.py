@@ -1,7 +1,7 @@
 import logging
 import os
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ async def handle_main_menu_support_callback(update: Update, context: ContextType
 
 # Handlers
 help_command_handler = CommandHandler("help", help_command)
-help_button_handler = MessageHandler(Filters.Regex(r"^(🆘 Help|Support|Bantuan)$"), help_command)
+help_button_handler = MessageHandler(filters.Regex(r"^(🆘 Help|Support|Bantuan)$"), help_command)
 
 support_callback_handlers = [
     CallbackQueryHandler(handle_faq_selection, pattern=f"^{FAQ_CALLBACK}"),
@@ -206,4 +206,4 @@ support_callback_handlers = [
 # It should be added with a group number that gives it priority for users in this state,
 # or rely on the fact that other general text handlers are less specific or not present.
 # The check `if not context.user_data.get('awaiting_support_message'): return` makes it fairly safe.
-direct_support_message_handler = MessageHandler(Filters.TEXT & ~Filters.COMMAND, handle_support_message)
+direct_support_message_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, handle_support_message)

@@ -1,7 +1,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, Filters
-from bot.utils.firebase_client import FirebaseClient # Import FirebaseClient
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from bot.utils.firebase_client import FirebaseClient
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,6 @@ my_referrals_handler = CommandHandler("myreferrals", my_referrals_command)
 # Catches "My Referrals", "Invite Friends", or "🎁 My Referrals" (emoji from main menu)
 # It's good practice to match the exact button text if possible.
 invite_friends_handler = MessageHandler(
-    Filters.Regex(r"^(\🎁 My Referrals|Invite Friends|My Referrals|Referral)$"),
+    filters.Regex(r"^(\🎁 My Referrals|Invite Friends|My Referrals|Referral)$"),
     my_referrals_command
 )

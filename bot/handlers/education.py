@@ -1,6 +1,6 @@
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +250,7 @@ async def handle_main_menu_callback(update: Update, context: ContextTypes.DEFAUL
 
 # Handlers
 education_command_handler = CommandHandler("learn", education_command)
-education_button_handler = MessageHandler(Filters.Regex("^(📘 Learn About Ubuntium|Learn & Earn|Edukasi)$"), education_command)
+education_button_handler = MessageHandler(filters.Regex("^(📘 Learn About Ubuntium|Learn & Earn|Edukasi)$"), education_command)
 
 # Callback Query Handlers for inline buttons
 # Order matters: more specific regex first, or use specific callback data.
