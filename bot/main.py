@@ -108,6 +108,10 @@ async def main() -> None:
     await application.run_polling()
     logger.info("Ubuntium Bot shutting down.")
 
+# SAFE ASYNC LOOP FOR RENDER
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+    import nest_asyncio
+
+    nest_asyncio.apply()
+    asyncio.get_event_loop().run_until_complete(main())
