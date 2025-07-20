@@ -3,3 +3,4 @@ firebase-admin
 openai
 python-dotenv
 nest_asyncio
+Flask
