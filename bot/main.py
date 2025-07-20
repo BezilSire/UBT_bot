@@ -14,48 +14,45 @@ from telegram.ext import (
     PicklePersistence
 )
 
-# Import handlers from their modules
+# Load handlers and firebase utils
 from bot.handlers import onboarding, referral, vendor, wallet, education, support
 from bot.utils.firebase_client import FirebaseClient
+from bot.handlers.onboarding import get_main_menu_keyboard  # for menu command
 
-# Load environment variables from .env file
+# Load .env vars
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 FIREBASE_KEY_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH")
 
-# Basic logging setup
+# Setup logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Use the consistent main menu keyboard from the onboarding module
-from bot.handlers.onboarding import get_main_menu_keyboard
-
+# /menu command
 async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends the main menu, using the consistent keyboard."""
     await update.message.reply_text(
         "🏠 Main Menu:",
         reply_markup=get_main_menu_keyboard()
     )
 
-# --- Fallback Handlers ---
+# Unknown command fallback
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles unknown commands."""
     await update.message.reply_text("Sorry, I didn't understand that command. Try /start or /help.")
 
+# Global error logging
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Log Errors caused by Updates."""
     logger.error(f"Update {update} caused error {context.error}", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
         await update.effective_message.reply_text(
-            "Sorry, something went wrong. The developers have been notified. Please try again later."
+            "⚠️ Something went wrong. We’ve been notified. Please try again later."
         )
 
-# ✅ RENAMED: main() → start_bot() for external call from app.py
+# ✅ This is called from app.py
 async def start_bot() -> None:
-    """Run the bot via polling."""
+    """Starts the Telegram bot using long polling."""
     if not TELEGRAM_BOT_TOKEN:
         logger.critical("TELEGRAM_BOT_TOKEN not found in environment variables.")
         return
@@ -63,7 +60,7 @@ async def start_bot() -> None:
     try:
         firebase_client = FirebaseClient()
     except Exception as e:
-        logger.critical(f"CRITICAL: Failed to initialize FirebaseClient in main: {e}", exc_info=True)
+        logger.critical(f"CRITICAL: Failed to initialize FirebaseClient: {e}", exc_info=True)
         firebase_client = None
 
     persistence = PicklePersistence(filepath='ubuntium_bot_persistence')
@@ -77,11 +74,11 @@ async def start_bot() -> None:
 
     if firebase_client:
         application.bot_data['firebase_client'] = firebase_client
-        logger.info("FirebaseClient successfully added to application.bot_data.")
+        logger.info("✅ FirebaseClient added to bot_data.")
     else:
-        logger.warning("FirebaseClient was not initialized, not adding to application.bot_data. Bot features requiring Firebase will fail.")
+        logger.warning("⚠️ FirebaseClient not initialized. Some bot features may not work.")
 
-    # --- Register handlers ---
+    # === Register all handlers ===
     application.add_handler(onboarding.start_handler)
     application.add_handler(CommandHandler("menu", main_menu))
     application.add_handler(onboarding.onboarding_conv_handler)
@@ -103,10 +100,12 @@ async def start_bot() -> None:
         application.add_handler(handler)
     application.add_handler(support.direct_support_message_handler)
 
+    # Catch-all unknown command
     application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
     application.add_error_handler(error_handler)
 
-    logger.info("Ubuntium Bot starting...")
+    # Start bot with polling
+    logger.info("🚀 Ubuntium Bot starting...")
     await application.initialize()
     await application.run_polling()
-    logger.info("Ubuntium Bot shutting down.")
+    logger.info("🛑 Ubuntium Bot stopped.")
