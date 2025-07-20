@@ -53,8 +53,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             "Sorry, something went wrong. The developers have been notified. Please try again later."
         )
 
-async def main() -> None:
-    """Run the bot."""
+# ✅ RENAMED: main() → start_bot() for external call from app.py
+async def start_bot() -> None:
+    """Run the bot via polling."""
     if not TELEGRAM_BOT_TOKEN:
         logger.critical("TELEGRAM_BOT_TOKEN not found in environment variables.")
         return
@@ -80,6 +81,7 @@ async def main() -> None:
     else:
         logger.warning("FirebaseClient was not initialized, not adding to application.bot_data. Bot features requiring Firebase will fail.")
 
+    # --- Register handlers ---
     application.add_handler(onboarding.start_handler)
     application.add_handler(CommandHandler("menu", main_menu))
     application.add_handler(onboarding.onboarding_conv_handler)
@@ -100,6 +102,7 @@ async def main() -> None:
     for handler in support.support_callback_handlers:
         application.add_handler(handler)
     application.add_handler(support.direct_support_message_handler)
+
     application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
     application.add_error_handler(error_handler)
 
@@ -107,11 +110,3 @@ async def main() -> None:
     await application.initialize()
     await application.run_polling()
     logger.info("Ubuntium Bot shutting down.")
-
-# SAFE ASYNC LOOP FOR RENDER
-if __name__ == "__main__":
-    import asyncio
-    import nest_asyncio
-
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
