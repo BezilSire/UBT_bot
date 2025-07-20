@@ -53,7 +53,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             "Sorry, something went wrong. The developers have been notified. Please try again later."
         )
 
-async def main() -> None:
+async def main() -> Application:
     """Run the bot."""
     if not TELEGRAM_BOT_TOKEN:
         logger.critical("TELEGRAM_BOT_TOKEN not found in environment variables.")
@@ -105,13 +105,6 @@ async def main() -> None:
 
     logger.info("Ubuntium Bot starting...")
     await application.initialize()
-    await application.run_polling()
-    logger.info("Ubuntium Bot shutting down.")
-
-# SAFE ASYNC LOOP FOR RENDER
-if __name__ == "__main__":
-    import asyncio
-    import nest_asyncio
-
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+    # No longer polling, webhook will be used.
+    # await application.run_polling()
+    return application
